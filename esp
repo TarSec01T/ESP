@@ -1,0 +1,146 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local espInstances = {}
+local nameInstances = {}
+local espEnabled = false
+ 
+-- Configuración ESP con valores por defecto más atractivos
+local espSettings = {
+    color = Color3.fromRGB(0, 170, 255), -- Azul claro
+    transparency = 0.4,
+    nameColor = Color3.new(1, 1, 0), -- Amarillo
+    nameSize = 8,
+    espSize = UDim2.new(2, 0, 4, 0), -- Tamaño más alto
+    nameSizeLabel = UDim2.new(2, 0, 1, 0),
+}
+ 
+-- Crear el ESP
+local function createESP(part)
+    if part and not espInstances[part] then
+        local billboardGui = Instance.new("BillboardGui", part)
+        billboardGui.Size = espSettings.espSize
+        billboardGui.StudsOffset = Vector3.new(0, -0.2, 0)
+        billboardGui.AlwaysOnTop = true
+ 
+        local frame = Instance.new("Frame", billboardGui)
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundColor3 = espSettings.color
+        frame.BackgroundTransparency = espSettings.transparency
+ 
+        espInstances[part] = billboardGui -- Guardar referencia
+    else
+        warn("No se encontró la parte para crear el ESP o ya existe.")
+    end
+end
+ 
+-- Crear etiqueta de nombre e inventario
+local function createNameAndInventoryLabel(part, playerName, inventoryInfo)
+    if part and not nameInstances[part] then
+        local nameBillboardGui = Instance.new("BillboardGui", part)
+        nameBillboardGui.Size = espSettings.nameSizeLabel
+        nameBillboardGui.StudsOffset = Vector3.new(0, 2, 0)
+        nameBillboardGui.AlwaysOnTop = true
+ 
+        local nameLabel = Instance.new("TextLabel", nameBillboardGui)
+        nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = playerName .. "\n" .. inventoryInfo
+        nameLabel.TextColor3 = espSettings.nameColor
+        nameLabel.TextSize = espSettings.nameSize
+        nameLabel.Font = Enum.Font.SourceSansBold
+ 
+        nameInstances[part] = nameBillboardGui -- Guardar referencia
+    else
+        warn("No se encontró la parte para crear el nombre o ya existe.")
+    end
+end
+ 
+-- Obtener información del inventario
+local function getInventoryInfo(player)
+    local inventoryInfo = ""
+    local gunInventory = player:FindFirstChild("GunInventory")
+ 
+    if gunInventory then
+        for i = 0, 4 do
+            local slot = gunInventory:FindFirstChild("Slot" .. i)
+            inventoryInfo = inventoryInfo .. "Slot" .. i .. ": " .. (slot and slot:IsA("ObjectValue") and slot.Value and slot.Value.Name or "Vacío") .. "\n"
+        end
+    end
+ 
+    return inventoryInfo
+end
+ 
+-- Borrar ESP y nombres
+local function removeESP()
+    for _, esp in pairs(espInstances) do
+        esp:Destroy()
+    end
+    espInstances = {}
+end
+ 
+local function removeNames()
+    for _, name in pairs(nameInstances) do
+        name:Destroy()
+    end
+    nameInstances = {}
+end
+ 
+-- Configurar ESP y nombre para un jugador
+local function setupPlayer(player)
+    local function updateLabels()
+        local character = player.Character
+        local worldCharacter = character and character:FindFirstChild("WorldCharacter")
+        if worldCharacter then
+            createESP(worldCharacter:FindFirstChild("UpperTorso"))
+            createNameAndInventoryLabel(worldCharacter:FindFirstChild("Head"), player.Name, getInventoryInfo(player))
+        end
+    end
+ 
+    player.CharacterAdded:Connect(updateLabels)
+    updateLabels()
+end
+ 
+-- Alternar ESP
+local function toggleESP()
+    espEnabled = not espEnabled
+    if espEnabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            setupPlayer(player)
+        end
+    else
+        removeESP()
+        removeNames()
+    end
+end
+ 
+-- Entrada del teclado para alternar ESP y borrar todo
+UserInputService.InputBegan:Connect(function(input, isProcessed)
+    if not isProcessed then
+        if input.KeyCode == Enum.KeyCode.F1 then
+            toggleESP()
+        elseif input.KeyCode == Enum.KeyCode.B then
+            if UserInputService:IsKeyDown(Enum.KeyCode.L) then
+                removeESP()
+                removeNames()
+            end
+        end
+    end
+end)
+ 
+-- Comprobar cada frame si los jugadores en el juego tienen ESP
+RunService.Heartbeat:Connect(function()
+    if espEnabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            setupPlayer(player)
+        end
+    end
+end)
+ 
+-- Configurar ESP para jugadores existentes al iniciar
+for _, player in ipairs(Players:GetPlayers()) do
+    setupPlayer(player)
+end
+ 
+-- Conectar evento para nuevos jugadores
+Players.PlayerAdded:Connect(setupPlayer)
